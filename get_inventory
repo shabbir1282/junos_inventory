@@ -1,0 +1,340 @@
+#!/usr/bin/env python3
+
+from lxml import etree
+import os, glob, re, pprint, sys
+import xlsxwriter
+import datetime
+
+class WriteExcel(object):
+    """
+    write data to excel sheet!
+
+
+    """
+    def __init__(self,filename):
+        self.filename = filename
+        filename = "show_chassis_hardware_"+str(datetime.date.today())
+        print "just before excel!"
+        workbook = xlsxwriter.Workbook(excel_filename+".xlsx")
+        worksheet = workbook.add_worksheet(host_name)
+
+    
+def write_excel():
+    return True
+
+#
+#import tarfile
+#tar = tarfile.open(tar_output)
+#tar.extractall()
+#tar.list()
+#tar.close()
+#exit()
+def split_xml(f):
+    # split the three xml schemas from the file into three saperate list of strings
+    start = False
+    count = 1
+    list_of_xmls = []
+
+    #print type(f)
+    for line in f:
+        if "host-name" in line:
+            # search for host-name in non-traditional way
+            host_name = line.split('>')[1].split('<')[0]
+            #print host_name
+            list_of_xmls.insert(0,host_name)
+        if "<rpc-reply xmlns" in line:
+            start=True
+            xmls = ""
+            #xmls = xmls + line
+            #print line
+        if start == True:
+            xmls = xmls + line
+        if "</rpc-reply>" in line:
+            start = False
+            #xmls = xmls + line
+            list_of_xmls.insert(count,xmls)
+            count +=1
+    #pprint(list_of_xmls)
+    return list_of_xmls
+
+
+def parse_junos_xml(xml_file):
+    #print xml_file
+    open_file = open(xml_file)
+    #xml = open_file.read().decode('ascii')
+    host_name = ""
+    #print "usman "+str(host_number)
+    xfps = []
+    inf_1g = inf_10g =  0
+    # Grab the host-name from show version
+    # for line in open_file:
+    #     if "host-name" in line:
+    #         host_name = line.split('>')[1].split('<')[0]
+    sheet_row = 0
+    sheet_col = 0
+
+    #shb_str =  split_xml(open_file)
+    print "shabbir======================================"
+    shb_str = open_file.read() 
+    #print shb_str
+    #exit(0)
+    
+    ele_num = 0
+    #print shb_str[3]
+    #host_name = shb_str[0]
+    #print "writing host-name to excel sheet!"+host_name
+    #worksheet.write(host_number,0,host_name)
+    #worksheet.write(27,1,"shabbir")
+
+    # needs RND
+    # root = etree.fromstring(shb_str[3])
+    # print root.xpath("//rpc-reply/software-information/host-name")    
+
+    loop_count = 0
+    root = etree.fromstring(shb_str)
+    print "inside loop"
+
+
+    #for element in root.iter('{*}chassis')):
+    #    print("%s - %s" % (element.tag, element.text))
+    modnum = micnum = picnum = txnum = 0
+    modnum = modnum + 2
+    sheet_row_number = 2
+    for ele in root.iter('{*}chassis'):
+        print("Device model is: {}, serial number is: {}".format(
+            ele.find('{*}description').text,
+            ele.find('{*}serial-number').text)
+        )
+        # for m-series
+        worksheet.write(1,0,ele.find('{*}name').text)
+        worksheet.write(1,2,ele.find('{*}serial-number').text)
+        worksheet.write(1,3,ele.find('{*}description').text)
+
+        if re.match('^M\d', ele.find('{*}description').text):
+
+            for mod in root.iter('{*}chassis-module'):
+                
+                if mod.find('{*}name').text.split()[0] == 'FPC':
+                    print("{}, {}".format(
+                        mod.find('{*}name').text,
+                        mod.find('{*}description').text)
+                        )
+                picnum = 0
+                for sub in mod.iter('{*}chassis-sub-module'):
+                    
+                    print("PIC {}: {}, type {}".format(
+                        picnum,
+                        sub.find('{*}name').text,
+                        sub.find('{*}description').text)
+                    )
+                    txnum = 0
+                    picnum +=1
+                    for subsub in sub.iter('{*}chassis-sub-sub-module'):
+                        print("XFP {}: {}, type {}".format(
+                        txnum,
+                        subsub.find('{*}name').text,
+                        subsub.find('{*}description').text)
+                        )
+                        txnum +=1
+                        xfps.append(subsub.find('{*}description').text)
+        # for mx-series
+
+        if re.match('^MX\d', ele.find('{*}description').text):
+            for mod in root.iter('{*}chassis-module'):
+
+                worksheet.write(sheet_row_number,0,mod.find('{*}name').text)
+                worksheet.write(sheet_row_number,1,mod.find('{*}part-number').text)
+                worksheet.write(sheet_row_number,2,mod.find('{*}serial-number').text)
+                worksheet.write(sheet_row_number,3,mod.find('{*}description').text)
+                #csv.write('"sheet_row_number,0,mod.find('{*}name').text"')
+                
+                sheet_row_number +=1
+
+                if mod.find('{*}name').text.split()[0] == 'FPC':
+                    print("{}, {}".format(
+                        mod.find('{*}name').text,
+                        mod.find('{*}description').text)
+                        )
+                    worksheet.write(sheet_row_number,0,mod.find('{*}name').text)
+                    worksheet.write(sheet_row_number,1,mod.find('{*}part-number').text)
+                    worksheet.write(sheet_row_number,2,mod.find('{*}serial-number').text)
+                    worksheet.write(sheet_row_number,3,mod.find('{*}description').text)
+
+                    sheet_row_number +=1
+
+                micnum = 0
+                for sub in mod.iter('{*}chassis-sub-module'):
+                    micnum +=1
+                    print("MIC {}: {}, type {}".format(
+                        micnum,
+                        sub.find('{*}name').text,
+                        sub.find('{*}description').text)
+                    )
+                    worksheet.write(sheet_row_number,0,sub.find('{*}name').text)
+                    worksheet.write(sheet_row_number,1,sub.find('{*}part-number').text)
+                    worksheet.write(sheet_row_number,2,sub.find('{*}serial-number').text)
+                    worksheet.write(sheet_row_number,3,sub.find('{*}description').text)
+                    
+                    sheet_row_number +=1
+
+                    picnum = 0
+                    for subsub in sub.iter('{*}chassis-sub-sub-module'):
+                        print("PIC {}: {}, type {}".format(
+                        picnum,
+                        subsub.find('{*}name').text,
+                        subsub.find('{*}description').text)
+                        )
+                        picnum +=1
+                        txnum = 0
+                        print "writing to excel"
+                        worksheet.write(sheet_row_number,0,subsub.find('{*}name').text)
+                        worksheet.write(sheet_row_number,1,subsub.find('{*}part-number').text)
+                        worksheet.write(sheet_row_number,2,subsub.find('{*}serial-number').text)
+                        worksheet.write(sheet_row_number,3,subsub.find('{*}description').text)
+
+                        sheet_row_number +=1
+
+                        for subsubsub in subsub.iter('{*}chassis-sub-sub-sub-module'):
+                            print("XFP {}: {}, type {}".format(
+                            txnum,
+                            subsubsub.find('{*}name').text,
+                            subsubsub.find('{*}description').text)
+                            )
+                            #print "adding XFPs!"
+                            worksheet.write(sheet_row_number,0,subsubsub.find('{*}name').text)
+                            worksheet.write(sheet_row_number,1,subsubsub.find('{*}part-number').text)
+                            worksheet.write(sheet_row_number,2,subsubsub.find('{*}serial-number').text)
+                            worksheet.write(sheet_row_number,3,subsubsub.find('{*}description').text)
+
+                            sheet_row_number +=1
+
+                            xfps.append(subsubsub.find('{*}description').text)
+                            txnum +=1
+                modnum += 1
+                #sheet_row_number +=1
+                print str(sheet_row_number)+" sheet number"
+
+    
+    one_g = re.compile("ge-", re.IGNORECASE)
+    ten_g = re.compile("xe-", re.IGNORECASE)
+    
+    
+    for ele in root.iter('{*}physical-interface'):
+        if one_g.search(ele.find('{*}name').text):
+            print("Interface: {}, admin-status, {} oper-status: {}".format(
+                ele.find('{*}name').text,
+                ele.find('{*}admin-status').text,
+                ele.find('{*}oper-status').text)
+            )
+            if ele.find('{*}admin-status').text == "up" and ele.find('{*}oper-status').text == "up":
+                inf_1g +=1
+        if ten_g.search(ele.find('{*}name').text):
+            print("Interface: {}, admin-status, {} oper-status: {}".format(
+                ele.find('{*}name').text,
+                ele.find('{*}admin-status').text,
+                ele.find('{*}oper-status').text)
+            )
+            if ele.find('{*}admin-status').text == "up" and ele.find('{*}oper-status').text == "up":
+                inf_10g +=1
+    #print "host_number "+str(host_number)+" 1g "+str(inf_1g)
+    #worksheet.write(host_number,7,inf_1g)
+    #print "host_number "+str(host_number)+" 10g "+str(inf_10g)
+    #worksheet.write(host_number,8,inf_10g)
+        
+
+
+    xfps.sort()
+
+    temp=set(xfps)
+    result={}
+    for i in temp:
+        result[i]=xfps.count(i)
+
+    
+    # for k, v in result.iteritems():
+        # print "{}    {}".format(k, v)
+        # cell_number = 1
+        # if v == 'SX':
+            # cell_number = 1
+        # if v == 'SFP-LX10':
+            # cell_number = 2
+        # if v == 'SFP-IR':
+            # cell_number = 4
+        # if v == 'XFP-10G-LR':
+            # cell_number = 5
+        # if v == 'SFP-T':
+            # cell_number = 3
+
+        # worksheet.write(host_number,cell_number, v)
+
+        
+
+    #print result['SFP-LX10']
+    # worksheet.write(host_number,2, result['SX'])
+    # worksheet.write(host_number,2, result['SFP-LX10'])
+    # worksheet.write(host_number,2, result['SFP-IR'])
+    # worksheet.write(host_number,2, result['XFP-10G-LR'])
+    # worksheet.write(host_number,2, result['SFP-T'])
+    
+    
+    # pprint.pprint(result)
+    #docroot = xmldoc.getroot()
+    
+    open_file.close()
+    #host_number +=1
+
+
+
+
+if __name__ == "__main__":
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--dir", type=str)
+    parser.add_argument("-f", "--file", type=str)
+    parser.add_argument("-v", "--verbosity", action="count", default=0)
+    args = parser.parse_args()
+
+    if args.verbosity >= 2:
+        print "Running '{}'".format(__file__)
+    if args.verbosity >= 1:
+        print "{}^{} ==".format(args.x, args.y),
+
+    args = parser.parse_args()
+    filename = args.file
+    directory = args.dir
+    excel_filename = "show_chassis_hardware_"+str(datetime.date.today())
+    #print str(datetime.date.today())
+    workbook = xlsxwriter.Workbook(excel_filename+".xlsx")
+        
+    worksheet = workbook.add_worksheet("interfaces")
+    worksheet.write(0,0,"Item")
+    worksheet.write(0,1, "Part number")
+    worksheet.write(0,2, "Serial number")
+    worksheet.write(0,3, "Description")
+
+    csv = open(excel_filename+".csv","w") 
+    csv.write('"Item","Part Number","Serial Number","Description"')
+
+    
+    
+    if filename:
+        print "Processsing"+filename
+        parse_junos_xml(filename)
+    
+    if directory:
+        os.chdir(directory)
+        file_number = 1
+        for file in glob.glob("*.txt"):
+            print "openning "+file+" number " +str(file_number)
+            parse_junos_xml(file, file_number)
+            file_number +=1
+            print str(file_number)
+            # if file_number > 2:
+            #     workbook.close()
+            #     exit()
+
+    workbook.close()
+    exit()
+        
+        
