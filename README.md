@@ -9,7 +9,7 @@ xlsxwriter and lxml
   pip install xlsxwriter
   pip install lxml
 
-USAGE: python junos_inventory.py -f output.xml
+USAGE: python get_inventory.py -f output.xml
 
 
 
